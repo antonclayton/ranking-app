@@ -14,7 +14,7 @@ const PlaceCard = ({ place }: PlaceCardProps) => {
           {place.name}
         </Typography>
         <Typography variant="body2" color="text.secondary">
-          {place.types}
+          {place.tags.join(', ')}
         </Typography>
       </CardContent>
     </Card>

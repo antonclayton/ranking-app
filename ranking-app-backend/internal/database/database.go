@@ -21,9 +21,25 @@ func CreateTables(db *sql.DB) error {
 	CREATE TABLE IF NOT EXISTS places (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		name TEXT NOT NULL,
-		types TEXT,
 		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 		updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+	);
+	`
+
+	tagTable := `
+	CREATE TABLE IF NOT EXISTS tags (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		name TEXT NOT NULL UNIQUE
+	);
+	`
+
+	placeTagTable := `
+	CREATE TABLE IF NOT EXISTS place_tags (
+		place_id INTEGER,
+		tag_id INTEGER,
+		PRIMARY KEY (place_id, tag_id),
+		FOREIGN KEY (place_id) REFERENCES places(id),
+		FOREIGN KEY (tag_id) REFERENCES tags(id)
 	);
 	`
 
@@ -51,6 +67,16 @@ func CreateTables(db *sql.DB) error {
 	`
 
 	_, err := db.Exec(placeTable)
+	if err != nil {
+		return err
+	}
+
+	_, err = db.Exec(tagTable)
+	if err != nil {
+		return err
+	}
+
+	_, err = db.Exec(placeTagTable)
 	if err != nil {
 		return err
 	}

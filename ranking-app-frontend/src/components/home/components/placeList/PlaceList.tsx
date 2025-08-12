@@ -11,7 +11,7 @@ const PlaceList: React.FC<PlaceListProps> = ({ searchQuery }) => {
   const filteredPlaces = places.filter(
     (place) =>
       place.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      place.types.toLowerCase().includes(searchQuery.toLowerCase())
+      place.tags.join(',').toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   return (

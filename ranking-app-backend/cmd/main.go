@@ -10,7 +10,7 @@ import (
 
 func main() {
 	// Initialize the database
-	db, err := database.InitDB("./ranking.db")
+	db, err := database.InitDB("../ranking.db")
 	if err != nil {
 		log.Fatalf("Failed to initialize database: %v", err)
 	}
