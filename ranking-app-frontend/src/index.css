@@ -1,0 +1,51 @@
+:root {
+  box-sizing: border-box;
+
+  /* Color Palette */
+  --primary-color: #4caf50;       /* Primary green accent */
+  --primary-light: #80e27e;       /* Lighter green for hover states */
+  --primary-dark: #087f23;        /* Darker green for active states */
+  --background-dark: #121212;     /* Dark background */
+  --surface-dark: #1e1e1e;        /* Dark surface */
+  --surface-light: #2d2d2d;       /* Lighter surface for cards/containers */
+  --text-primary: #ffffff;        /* White text */
+  --text-secondary: #b0b0b0;      /* Slightly dimmed text */
+  --text-hint: #757575;           /* Hint/disabled text */
+  --divider: #424242;             /* Divider color */
+
+  /* Spacing System */
+  --spacing-xs: 0.5rem;    /* 8px */
+  --spacing-sm: 1rem;      /* 16px */
+  --spacing-md: 1.5rem;    /* 24px */
+  --spacing-lg: 2rem;      /* 32px */
+  --spacing-xl: 3rem;      /* 48px */
+  
+  /* Container padding */
+  --container-padding: var(--spacing-sm);
+  
+  /* Content max width */
+  --content-max-width: 1200px;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: inherit;
+}
+
+*, *::before, *::after {
+  box-sizing: inherit;
+}
+
+body {
+  font-family: system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: var(--background-dark); 
+  color: var(--text-primary);
+  min-height: 100vh;
+}
+
+button:focus-visible {
+  outline: 4px auto -webkit-focus-ring-color;
+}

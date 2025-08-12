@@ -1,0 +1,110 @@
+.navbar {
+    background-color: var(--surface-dark);
+    color: var(--text-primary);
+    padding: 1rem 0;
+    position: relative;
+  }
+  
+  .navContainer {
+    max-width: var(--container-max-width, 1200px);
+    margin: 0 auto;
+    padding: 0 2rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  
+  .logo {
+    color: var(--text-primary);
+    text-decoration: none;
+    font-size: 1.5rem;
+    font-weight: 700;
+    z-index: 1001;
+  }
+  
+  /* Hamburger Menu */
+  .hamburger {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    width: 30px;
+    height: 21px;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    z-index: 1001;
+  }
+  
+  .bar {
+    width: 100%;
+    height: 3px;
+    background-color: var(--text-primary);
+    transition: all 0.3s ease;
+  }
+  
+  .hamburger.active .bar:nth-child(1) {
+    transform: translateY(9px) rotate(45deg);
+  }
+  
+  .hamburger.active .bar:nth-child(2) {
+    opacity: 0;
+  }
+  
+  .hamburger.active .bar:nth-child(3) {
+    transform: translateY(-9px) rotate(-45deg);
+  }
+  
+  /* Navigation Links */
+  .navLinks {
+    position: fixed;
+    top: 0;
+    right: -100%;
+    width: 100%;
+    height: 100vh;
+    background-color: var(--surface-dark);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2rem;
+    transition: right 0.3s ease;
+    z-index: 1000;
+    padding: 2rem;
+  }
+  
+  .navLinks.active {
+    right: 0;
+  }
+  
+  .navLink {
+    color: var(--text-primary);
+    text-decoration: none;
+    font-size: 1.5rem;
+    transition: color 0.3s ease;
+  }
+  
+  .navLink:hover {
+    color: var(--primary-color);
+  }
+  
+  /* Desktop styles */
+  @media (min-width: 768px) {
+    .hamburger {
+      display: none;
+    }
+  
+    .navLinks {
+      position: static;
+      height: auto;
+      flex-direction: row;
+      width: auto;
+      background: transparent;
+      padding: 0;
+      gap: 1.5rem;
+    }
+  
+    .navLink {
+      font-size: 1rem;
+    }
+  }
