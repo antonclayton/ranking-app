@@ -1,12 +1,20 @@
-import React from 'react'
+import React, { useState } from 'react';
+import SearchBar from './components/searchBar/SearchBar';
+import PlaceList from './components/placeList/PlaceList';
 
 const Home = () => {
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const handleSearch = (query: string) => {
+    setSearchQuery(query);
+  };
+
   return (
     <div>
-      <h1>Welcome to the Home Page</h1>
-      <p>This is some test content to check spacing.</p>
+      <SearchBar onSearch={handleSearch} />
+      <PlaceList searchQuery={searchQuery} />
     </div>
-  )
-}
+  );
+};
 
-export default Home
+export default Home;
