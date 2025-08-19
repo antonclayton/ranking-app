@@ -2,15 +2,15 @@
   display: flex;
   justify-content: center;
   padding: var(--spacing-md) 0;
+  width: 100%;
 }
 
 .searchInput {
   width: 100%;
-  max-width: 500px;
   padding: var(--spacing-sm) var(--spacing-md);
   font-size: 1rem;
   border-radius: 25px;
-  border: 1px solid var(--divider);
+  border: 2px solid var(--divider);
   background-color: var(--surface-light);
   color: var(--text-primary);
   transition: all 0.3s ease;

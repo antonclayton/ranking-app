@@ -70,7 +70,7 @@
     gap: 3rem;
     transition: right 0.3s ease;
     z-index: 1000;
-    padding: 2rem;
+    padding: var(--spacing-lg);
     font-weight: bold;
   }
   

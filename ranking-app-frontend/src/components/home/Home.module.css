@@ -1,0 +1,24 @@
+.header {
+  display: flex;
+  align-items: center;
+  gap: 1rem; /* space between search and button */
+  padding: var(--spacing-md);
+}
+
+/* SearchBar should take the remaining width */
+.searchBarCol {
+  flex: 1 1 auto;
+  min-width: 0; /* allow input to shrink without overflowing */
+}
+
+/* Button keeps natural width, aligned right within its column */
+.buttonCol {
+  flex: 0 0 auto;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.createButton {
+  white-space: nowrap;
+  font-weight: 600; /* bold */
+}

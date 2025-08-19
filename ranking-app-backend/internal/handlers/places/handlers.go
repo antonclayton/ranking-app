@@ -13,36 +13,40 @@ import (
 
 func ListPlaces(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		places := []models.Place{}
-
-		rows, err := db.Query("SELECT id, name, types, created_at, updated_at FROM places")
+		query := `
+			SELECT
+				p.id, p.name, p.created_at, p.updated_at,
+				GROUP_CONCAT(t.name) AS tags
+			FROM
+				places p
+			LEFT JOIN
+				place_tags pt ON p.id = pt.place_id
+			LEFT JOIN
+				tags t ON pt.tag_id = t.id
+			GROUP BY
+				p.id
+		`
+		rows, err := db.Query(query)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 		defer rows.Close()
 
+		places := []models.Place{}
 		for rows.Next() {
 			var place models.Place
-			var typesStr string
-			var createdAt, updatedAt time.Time
-			if err := rows.Scan(&place.ID, &place.Name, &typesStr, &createdAt, &updatedAt); err != nil {
+			var tags sql.NullString // Use sql.NullString for tags
+
+			if err := rows.Scan(&place.ID, &place.Name, &place.CreatedAt, &place.UpdatedAt, &tags); err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
-			place.CreatedAt = createdAt
-			place.UpdatedAt = updatedAt
-			if typesStr != "" {
-				rawTypes := strings.Split(typesStr, ",")
-				place.Types = make([]string, 0, len(rawTypes))
-				for _, t := range rawTypes {
-					trimmed := strings.TrimSpace(t)
-					if trimmed != "" {
-						place.Types = append(place.Types, trimmed)
-					}
-				}
+
+			if tags.Valid {
+				place.Tags = strings.Split(tags.String, ",")
 			} else {
-				place.Types = []string{}
+				place.Tags = []string{}
 			}
 			places = append(places, place)
 		}
@@ -54,25 +58,55 @@ func ListPlaces(db *sql.DB) http.HandlerFunc {
 
 func CreatePlace(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		place := models.Place{}
+		var place models.Place
 		if err := json.NewDecoder(r.Body).Decode(&place); err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			http.Error(w, "Invalid request body", http.StatusBadRequest)
 			return
 		}
 
-		result, err := db.Exec("INSERT INTO places (name, types) VALUES (?, ?)", place.Name, strings.Join(place.Types, ","))
+		tx, err := db.Begin()
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			http.Error(w, "Failed to start transaction", http.StatusInternalServerError)
 			return
 		}
 
-		id, err := result.LastInsertId()
+		// Insert the place and get its ID
+		var placeID int
+		err = tx.QueryRow("INSERT INTO places (name) VALUES (?) RETURNING id", place.Name).Scan(&placeID)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			tx.Rollback()
+			http.Error(w, "Failed to create place", http.StatusInternalServerError)
+			return
+		}
+		place.ID = placeID
+
+		// Handle tags
+		if len(place.Tags) > 0 {
+			for _, tagName := range place.Tags {
+				// Find or create the tag
+				var tagID int
+				err := tx.QueryRow("INSERT INTO tags (name) VALUES (?) ON CONFLICT(name) DO UPDATE SET name=name RETURNING id", tagName).Scan(&tagID)
+				if err != nil {
+					tx.Rollback()
+					http.Error(w, "Failed to create or find tag", http.StatusInternalServerError)
+					return
+				}
+				// Associate tag with place
+				_, err = tx.Exec("INSERT INTO place_tags (place_id, tag_id) VALUES (?, ?)", placeID, tagID)
+				if err != nil {
+					tx.Rollback()
+					http.Error(w, "Failed to associate tag with place", http.StatusInternalServerError)
+					return
+				}
+			}
+		}
+
+		if err := tx.Commit(); err != nil {
+			http.Error(w, "Failed to commit transaction", http.StatusInternalServerError)
 			return
 		}
 
-		place.ID = int(id)
+		w.WriteHeader(http.StatusCreated)
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(place)
 	}
@@ -81,39 +115,38 @@ func CreatePlace(db *sql.DB) http.HandlerFunc {
 func GetPlace(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id := chi.URLParam(r, "id")
-		if id == "" {
-			http.Error(w, "id is required", http.StatusBadRequest)
-			return
-		}
 
-		var typesStr string
-		place := models.Place{}
-		err := db.QueryRow("SELECT id, name, types, created_at, updated_at FROM places WHERE id = ?", id).Scan(
-			&place.ID,
-			&place.Name,
-			&typesStr,
-			&place.CreatedAt,
-			&place.UpdatedAt,
-		)
-		if err == sql.ErrNoRows {
-			http.Error(w, "Place not found", http.StatusNotFound)
-			return
-		}
+		query := `
+			SELECT
+				p.id, p.name, p.created_at, p.updated_at,
+				GROUP_CONCAT(t.name) AS tags
+			FROM
+				places p
+			LEFT JOIN
+				place_tags pt ON p.id = pt.place_id
+			LEFT JOIN
+				tags t ON pt.tag_id = t.id
+			WHERE
+				p.id = ?
+			GROUP BY
+				p.id
+		`
+		var place models.Place
+		var tags sql.NullString
+		err := db.QueryRow(query, id).Scan(&place.ID, &place.Name, &place.CreatedAt, &place.UpdatedAt, &tags)
 		if err != nil {
+			if err == sql.ErrNoRows {
+				http.Error(w, "Place not found", http.StatusNotFound)
+				return
+			}
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		if typesStr != "" {
-			rawTypes := strings.Split(typesStr, ",")
-			place.Types = make([]string, 0, len(rawTypes))
-			for _, t := range rawTypes {
-				trimmed := strings.TrimSpace(t)
-				if trimmed != "" {
-					place.Types = append(place.Types, trimmed)
-				}
-			}
+
+		if tags.Valid {
+			place.Tags = strings.Split(tags.String, ",")
 		} else {
-			place.Types = []string{}
+			place.Tags = []string{}
 		}
 
 		w.Header().Set("Content-Type", "application/json")
@@ -124,109 +157,95 @@ func GetPlace(db *sql.DB) http.HandlerFunc {
 func UpdatePlace(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id := chi.URLParam(r, "id")
-		if id == "" {
-			http.Error(w, "id is required", http.StatusBadRequest)
+
+		var place models.Place
+		if err := json.NewDecoder(r.Body).Decode(&place); err != nil {
+			http.Error(w, "Invalid request body", http.StatusBadRequest)
 			return
 		}
 
-		// Decode into a map to check what fields are present
-		var updates map[string]interface{}
-		if err := json.NewDecoder(r.Body).Decode(&updates); err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+		tx, err := db.Begin()
+		if err != nil {
+			http.Error(w, "Failed to start transaction", http.StatusInternalServerError)
 			return
 		}
 
-		fields := []string{}
-		args := []interface{}{}
-
-		if name, ok := updates["name"].(string); ok {
-			fields = append(fields, "name = ?")
-			args = append(args, name)
+		// Update place name
+		_, err = tx.Exec("UPDATE places SET name = ?, updated_at = ? WHERE id = ?", place.Name, time.Now(), id)
+		if err != nil {
+			tx.Rollback()
+			http.Error(w, "Failed to update place", http.StatusInternalServerError)
+			return
 		}
-		if types, ok := updates["types"].([]interface{}); ok {
-			// Convert []interface{} to []string
-			strTypes := make([]string, 0, len(types))
-			for _, t := range types {
-				if s, ok := t.(string); ok {
-					strTypes = append(strTypes, s)
+
+		// Delete old tags for the place
+		_, err = tx.Exec("DELETE FROM place_tags WHERE place_id = ?", id)
+		if err != nil {
+			tx.Rollback()
+			http.Error(w, "Failed to delete old tags", http.StatusInternalServerError)
+			return
+		}
+
+		// Add new tags
+		if len(place.Tags) > 0 {
+			for _, tagName := range place.Tags {
+				var tagID int
+				err := tx.QueryRow("INSERT INTO tags (name) VALUES (?) ON CONFLICT(name) DO UPDATE SET name=name RETURNING id", tagName).Scan(&tagID)
+				if err != nil {
+					tx.Rollback()
+					http.Error(w, "Failed to create or find tag", http.StatusInternalServerError)
+					return
+				}
+				_, err = tx.Exec("INSERT INTO place_tags (place_id, tag_id) VALUES (?, ?)", id, tagID)
+				if err != nil {
+					tx.Rollback()
+					http.Error(w, "Failed to associate tag with place", http.StatusInternalServerError)
+					return
 				}
 			}
-			fields = append(fields, "types = ?")
-			args = append(args, strings.Join(strTypes, ","))
 		}
 
-		if len(fields) == 0 {
-			http.Error(w, "no valid fields to update", http.StatusBadRequest)
+		if err := tx.Commit(); err != nil {
+			http.Error(w, "Failed to commit transaction", http.StatusInternalServerError)
 			return
 		}
 
-		// Update the updated_at field
-		fields = append(fields, "updated_at = ?")
-		args = append(args, time.Now().UTC().Truncate(time.Second))
-		args = append(args, id)
-		query := "UPDATE places SET " + strings.Join(fields, ", ") + " WHERE id = ?"
-		_, err := db.Exec(query, args...)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		// Fetch the updated place
-		var updatedPlace models.Place
-		var typesStr string
-		err = db.QueryRow("SELECT id, name, types, created_at, updated_at FROM places WHERE id = ?", id).Scan(
-			&updatedPlace.ID,
-			&updatedPlace.Name,
-			&typesStr,
-			&updatedPlace.CreatedAt,
-			&updatedPlace.UpdatedAt,
-		)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		if typesStr != "" {
-			rawTypes := strings.Split(typesStr, ",")
-			updatedPlace.Types = make([]string, 0, len(rawTypes))
-			for _, t := range rawTypes {
-				trimmed := strings.TrimSpace(t)
-				if trimmed != "" {
-					updatedPlace.Types = append(updatedPlace.Types, trimmed)
-				}
-			}
-		} else {
-			updatedPlace.Types = []string{}
-		}
-
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(updatedPlace)
+		// Fetch and return the updated place
+		GetPlace(db)(w, r)
 	}
 }
 
 func DeletePlace(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id := chi.URLParam(r, "id")
-		if id == "" {
-			http.Error(w, "id is required", http.StatusBadRequest)
-			return
-		}
 
-		// Check if the place exists
-		var exists bool
-		err := db.QueryRow("SELECT EXISTS (SELECT 1 FROM places WHERE id = ?)", id).Scan(&exists)
+		tx, err := db.Begin()
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		if !exists {
-			http.Error(w, "place not found", http.StatusNotFound)
+
+		// First delete associations in place_tags
+		_, err = tx.Exec("DELETE FROM place_tags WHERE place_id = ?", id)
+		if err != nil {
+			tx.Rollback()
+			http.Error(w, "Failed to delete tag associations", http.StatusInternalServerError)
 			return
 		}
 
-		_, err = db.Exec("DELETE FROM places WHERE id = ?", id)
+		// Then delete the place
+		_, err = tx.Exec("DELETE FROM places WHERE id = ?", id)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			tx.Rollback()
+			http.Error(w, "Failed to delete place", http.StatusInternalServerError)
 			return
 		}
+
+		if err := tx.Commit(); err != nil {
+			http.Error(w, "Failed to commit transaction", http.StatusInternalServerError)
+			return
+		}
+
 		w.WriteHeader(http.StatusNoContent)
 	}
 }

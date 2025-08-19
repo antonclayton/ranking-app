@@ -6,7 +6,7 @@ import "time"
 type Place struct {
 	ID        int       `json:"id"`
 	Name      string    `json:"name"`
-	Types     []string  `json:"types"` // e.g., ["restaurant", "cafe", "bar"]
+	Tags      []string  `json:"tags"` // e.g., ["restaurant", "cafe", "bar"]
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }

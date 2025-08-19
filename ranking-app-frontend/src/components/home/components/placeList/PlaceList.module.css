@@ -1,5 +1,5 @@
 .placeListContainer {
-  padding: 20px;
+  padding: var(--spacing-md);
 }
 
 .placeList {
